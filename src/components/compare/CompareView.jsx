@@ -4,7 +4,7 @@ import { SECTIONS, getGroupKey } from '../../utils/positionGroups';
 import { fetchRoster } from '../../services/dataService';
 import { NFL_TEAMS, YEARS } from '../../constants/teams';
 
-const NAME_RE = /^[a-zA-Z0-9]+$/;
+const NAME_RE = /^[a-zA-Z0-9 ]+$/;
 
 const YEARS_DESC = [...YEARS].reverse();
 
@@ -289,7 +289,7 @@ export default function CompareView({ savedRosters, savedComparisons, onSaveComp
   function handleSave() {
     const trimmed = saveName.trim();
     if (!trimmed) { setSaveError('Name is required.'); return; }
-    if (!NAME_RE.test(trimmed)) { setSaveError('Alphanumeric only (no spaces).'); return; }
+    if (!NAME_RE.test(trimmed)) { setSaveError('Letters, numbers, and spaces only.'); return; }
     if (trimmed.length > 30) { setSaveError('Max 30 characters.'); return; }
     if (savedComparisons.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
       setSaveError('Name already exists.'); return;
