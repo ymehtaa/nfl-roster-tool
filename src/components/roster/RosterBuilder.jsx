@@ -29,7 +29,7 @@ function groupCountColor(filled, slots) {
   return 'text-yellow-400';
 }
 
-const NAME_RE = /^[a-zA-Z0-9]+$/;
+const NAME_RE = /^[a-zA-Z0-9 ]+$/;
 
 export default function RosterBuilder({ roster, onRemovePlayer, onEmpty, onSave, savedRosterNames = [] }) {
   const [collapsed, setCollapsed] = useState(
@@ -73,7 +73,7 @@ export default function RosterBuilder({ roster, onRemovePlayer, onEmpty, onSave,
   function handleSaveSubmit() {
     const trimmed = saveName.trim();
     if (!trimmed) { setSaveError('Name is required.'); return; }
-    if (!NAME_RE.test(trimmed)) { setSaveError('Alphanumeric only (no spaces).'); return; }
+    if (!NAME_RE.test(trimmed)) { setSaveError('Letters, numbers, and spaces only.'); return; }
     if (trimmed.length > 30) { setSaveError('Max 30 characters.'); return; }
     if (savedRosterNames.some(n => n.toLowerCase() === trimmed.toLowerCase())) {
       setSaveError('Name already exists.'); return;
@@ -144,7 +144,7 @@ export default function RosterBuilder({ roster, onRemovePlayer, onEmpty, onSave,
                 value={saveName}
                 onChange={handleSaveNameChange}
                 onKeyDown={handleSaveKeyDown}
-                placeholder="Roster name (alphanumeric)"
+                placeholder="Roster name"
                 maxLength={30}
                 className="flex-1 bg-gray-700 border border-gray-600 focus:border-blue-500 focus:outline-none text-white text-xs rounded-lg px-3 py-1.5 placeholder-gray-500 transition-colors"
               />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const NAME_RE = /^[a-zA-Z0-9]+$/;
+const NAME_RE = /^[a-zA-Z0-9 ]+$/;
 const MAX_NAME_LEN = 30;
 
 function formatDate(ts) {
@@ -18,7 +18,7 @@ export default function SavedRosters({ rosters, currentRosterEmpty, onSave, onLo
 
   function validate(value) {
     if (!value) return 'Name is required.';
-    if (!NAME_RE.test(value)) return 'Alphanumeric characters only (no spaces).';
+    if (!NAME_RE.test(value)) return 'Letters, numbers, and spaces only.';
     if (value.length > MAX_NAME_LEN) return `Max ${MAX_NAME_LEN} characters.`;
     if (rosters.some(r => r.name.toLowerCase() === value.toLowerCase())) return 'A roster with that name already exists.';
     return null;
