@@ -26,21 +26,40 @@ _depth_cache: dict[int, pl.DataFrame] = {}
 
 # ---------------------------------------------------------------------------
 # Historical team abbreviation mappings
-# Franchises that relocated/renamed use different abbreviations in nflverse
-# historical data.  Maps current_abbr -> [(historical_abbr, last_season), ...]
+# nflverse uses three distinct abbreviation schemes across history:
+#   2000–2001: ARI, BAL, CLE, STL  (original)
+#   2002–2015: ARZ, BLT, CLV, HST, SL  (different scheme)
+#   2016+:     ARI, BAL, CLE, HOU, LA   (modern)
+#
+# Each entry is either:
+#   (historical_abbr, last_season)              — applies from beginning through last_season
+#   (historical_abbr, first_season, last_season) — applies only within the given range
 # ---------------------------------------------------------------------------
-_RELOCATION_MAP: dict[str, list[tuple[str, int]]] = {
-    "LAC": [("SD",  2016)],  # San Diego Chargers through 2016
-    "LV":  [("OAK", 2019)],  # Oakland Raiders through 2019
-    "LA":  [("STL", 2015)],  # St. Louis Rams through 2015
+_RELOCATION_MAP: dict[str, list[tuple]] = {
+    # True relocations
+    "LAC": [("SD",  2016)],        # San Diego Chargers through 2016
+    "LV":  [("OAK", 2019)],        # Oakland Raiders through 2019
+    # Rams: STL 2000-2001, then SL 2002-2015 (nflverse quirk), then LA 2016+
+    "LA":  [("STL", 2001), ("SL", 2015)],
+    # Teams with non-standard nflverse abbreviations in 2002-2015 only
+    "ARI": [("ARZ", 2002, 2015)],  # Arizona Cardinals
+    "BAL": [("BLT", 2002, 2015)],  # Baltimore Ravens
+    "CLE": [("CLV", 2002, 2015)],  # Cleveland Browns
+    "HOU": [("HST", 2002, 2015)],  # Houston Texans (expansion team, starts 2002)
 }
 
 
 def _resolve_team_abbr(team: str, season: int) -> str:
     """Return the nflverse abbreviation used for *team* in *season*."""
-    for historical_abbr, last_season in _RELOCATION_MAP.get(team, []):
-        if season <= last_season:
-            return historical_abbr
+    for entry in _RELOCATION_MAP.get(team, []):
+        if len(entry) == 3:
+            historical_abbr, first_season, last_season = entry
+            if first_season <= season <= last_season:
+                return historical_abbr
+        else:
+            historical_abbr, last_season = entry
+            if season <= last_season:
+                return historical_abbr
     return team
 
 
