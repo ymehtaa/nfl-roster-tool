@@ -50,6 +50,7 @@ export const useRosterStore = create(
       isLoading: false,
       error: null,
       lastImport: null,
+      currentRosterName: null,
 
       // ── Saved items (cloud-synced) ────────────────────────────────────────
       savedRosters: [],
@@ -85,7 +86,16 @@ export const useRosterStore = create(
           builtRoster: s.builtRoster.filter((p) => p.builtId !== builtId),
         })),
 
-      clearRoster: () => set({ builtRoster: [] }),
+      clearRoster: () => set({ builtRoster: [], currentRosterName: null }),
+
+      loadSharedRoster: (players) =>
+        set({
+          builtRoster: players
+            .slice(0, 53)
+            .map((p) => ({ ...p, builtId: `built-${Date.now()}-${Math.random().toString(36).slice(2)}` })),
+          activeTab: 'builder',
+          currentRosterName: null,
+        }),
 
       // ── Saved roster actions ──────────────────────────────────────────────
 
@@ -105,6 +115,7 @@ export const useRosterStore = create(
           savedRosters: s.savedRosters.some((r) => r.name === name)
             ? s.savedRosters.map((r) => (r.name === name ? entry : r))
             : [...s.savedRosters, entry],
+          currentRosterName: name,
         }));
 
         try {
@@ -127,7 +138,7 @@ export const useRosterStore = create(
 
       loadSavedRoster: (name) => {
         const found = get().savedRosters.find((r) => r.name === name);
-        if (found) set({ builtRoster: found.players });
+        if (found) set({ builtRoster: found.players, currentRosterName: name });
       },
 
       // ── Saved comparison actions ──────────────────────────────────────────
@@ -218,6 +229,7 @@ export const useRosterStore = create(
         builtRoster: state.builtRoster,
         savedRosters: state.savedRosters,
         savedComparisons: state.savedComparisons,
+        currentRosterName: state.currentRosterName,
       }),
     }
   )

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import PositionBadge from '../ui/PositionBadge';
 import { SECTIONS, ALL_GROUPS, getGroupKey } from '../../utils/positionGroups';
+import { createShare } from '../../services/shareService';
+import { useRosterStore } from '../../stores/useRosterStore';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MAX_ROSTER = 53;
 
@@ -32,12 +35,37 @@ function groupCountColor(filled, slots) {
 const NAME_RE = /^[a-zA-Z0-9 ]+$/;
 
 export default function RosterBuilder({ roster, onRemovePlayer, onEmpty, onSave, savedRosterNames = [] }) {
+  const { user } = useAuth();
+  const currentRosterName = useRosterStore((s) => s.currentRosterName);
   const [collapsed, setCollapsed] = useState(
     () => new Set(SECTIONS.flatMap(s => s.groups.map(g => g.key)))
   );
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [shareState, setShareState] = useState('idle'); // 'idle'|'loading'|'copied'|'error'
+
+  function deriveShareName() {
+    const teams = [...new Set(roster.map((p) => p.team))];
+    const years = [...new Set(roster.map((p) => p.year))];
+    if (teams.length === 1 && years.length === 1) return `${years[0]} ${teams[0]} Roster`;
+    return currentRosterName ?? 'Custom Roster';
+  }
+
+  async function handleShare() {
+    setShareState('loading');
+    try {
+      const name = deriveShareName();
+      const shareId = await createShare(name, roster, user?.id ?? null);
+      const url = `${window.location.origin}?share=${shareId}`;
+      await navigator.clipboard.writeText(url);
+      setShareState('copied');
+      setTimeout(() => setShareState('idle'), 2500);
+    } catch {
+      setShareState('error');
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  }
 
   const groupedSections = SECTIONS.map(section => ({
     ...section,
@@ -124,6 +152,20 @@ export default function RosterBuilder({ roster, onRemovePlayer, onEmpty, onSave,
             >
               Save
             </button>
+            {roster.length > 0 && (
+              <button
+                onClick={handleShare}
+                disabled={shareState === 'loading'}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50 transition-colors"
+              >
+                {shareState === 'loading' && (
+                  <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                )}
+                {shareState === 'copied' && '✓ Link copied!'}
+                {shareState === 'error' && 'Failed — try again'}
+                {shareState === 'idle' && '⎘ Share'}
+              </button>
+            )}
             <button
               onClick={onEmpty}
               disabled={roster.length === 0}
