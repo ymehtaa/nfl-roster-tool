@@ -3,6 +3,7 @@ import PositionBadge from '../ui/PositionBadge';
 import { SECTIONS, getGroupKey } from '../../utils/positionGroups';
 import { fetchRoster } from '../../services/dataService';
 import { NFL_TEAMS, YEARS } from '../../constants/teams';
+import { createComparisonShare } from '../../services/shareService';
 
 const NAME_RE = /^[a-zA-Z0-9 ]+$/;
 
@@ -246,7 +247,7 @@ function RosterColumn({ slot, label, savedRosters, type, onTypeChange, team, yea
 
 // ── Main CompareView ───────────────────────────────────────────────────────
 
-export default function CompareView({ savedRosters, savedComparisons, onSaveComparison, onDeleteComparison }) {
+export default function CompareView({ savedRosters, savedComparisons, onSaveComparison, onDeleteComparison, sharedComparison, onSharedComparisonConsumed, user }) {
   const [left,  setLeft]  = useState(emptySlot);
   const [right, setRight] = useState(emptySlot);
 
@@ -259,6 +260,13 @@ export default function CompareView({ savedRosters, savedComparisons, onSaveComp
 
   const [saveName,  setSaveName]  = useState('');
   const [saveError, setSaveError] = useState('');
+  const [shareState, setShareState] = useState('idle'); // 'idle'|'loading'|'copied'|'error'
+
+  useEffect(() => {
+    if (!sharedComparison) return;
+    loadComparison(sharedComparison);
+    onSharedComparisonConsumed?.();
+  }, [sharedComparison]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchSlot(side, team, year) {
     const setter = side === 'left' ? setLeft : setRight;
@@ -299,6 +307,26 @@ export default function CompareView({ savedRosters, savedComparisons, onSaveComp
     setSaveError('');
   }
 
+  async function handleShare() {
+    setShareState('loading');
+    try {
+      const name = `${left.label} vs ${right.label}`;
+      const shareId = await createComparisonShare(
+        name,
+        { label: left.label, players: left.roster },
+        { label: right.label, players: right.roster },
+        user?.id ?? null,
+      );
+      const url = `${window.location.origin}?shareComp=${shareId}`;
+      await navigator.clipboard.writeText(url);
+      setShareState('copied');
+      setTimeout(() => setShareState('idle'), 2500);
+    } catch {
+      setShareState('error');
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  }
+
   const bothFilled = left.roster !== null && right.roster !== null;
 
   return (
@@ -333,6 +361,18 @@ export default function CompareView({ savedRosters, savedComparisons, onSaveComp
                   className="bg-blue-700 hover:bg-blue-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
                 >
                   Save
+                </button>
+                <button
+                  onClick={handleShare}
+                  disabled={shareState === 'loading'}
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  {shareState === 'loading' && (
+                    <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {shareState === 'copied'  && '✓ Link copied!'}
+                  {shareState === 'error'   && 'Failed — try again'}
+                  {shareState === 'idle'    && '⎘ Share'}
                 </button>
               </div>
               {saveError && <p className="text-xs text-red-400">{saveError}</p>}
