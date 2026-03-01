@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NFL_TEAMS, YEARS } from '../../constants/teams';
+import { NFL_TEAMS, YEARS, getTeamName } from '../../constants/teams';
 
 export default function SourceSelector({ onImport, isLoading }) {
   const [selectedYear, setSelectedYear] = useState(2007);
@@ -42,7 +42,7 @@ export default function SourceSelector({ onImport, isLoading }) {
           >
             {NFL_TEAMS.map((t) => (
               <option key={t.abbr} value={t.abbr}>
-                {t.name} ({t.abbr})
+                {getTeamName(t, selectedYear)} ({t.abbr})
               </option>
             ))}
           </select>
