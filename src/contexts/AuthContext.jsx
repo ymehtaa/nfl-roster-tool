@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         const u = session?.user ?? null;
+        console.log(`[nfl:auth] onAuthStateChange event="${event}" user=${u?.id ?? 'none'}`);
         setUser(u);
 
         if (event === 'SIGNED_IN' && u) {
@@ -28,6 +29,7 @@ export function AuthProvider({ children }) {
         }
 
         if (event === 'SIGNED_OUT') {
+          console.log('[nfl:auth] signed out — clearing cloud items from store');
           useRosterStore.getState().clearCloudItems();
         }
       }
@@ -37,6 +39,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function hydrateFromSupabase(u) {
+    console.log(`[nfl:auth] hydrating from Supabase for user ${u.id}`);
+
     // 1. Fetch all saved items for this user from Supabase
     const { data, error } = await supabase
       .from('saved_items')
@@ -44,9 +48,11 @@ export function AuthProvider({ children }) {
       .eq('user_id', u.id);
 
     if (error) {
-      console.error('Hydration error:', error.message);
+      console.error('[nfl:auth] hydration fetch FAILED:', error.message, error);
       return;
     }
+
+    console.log(`[nfl:auth] hydration fetched ${data.length} items from Supabase`);
 
     const cloudRosters = data
       .filter((r) => r.type === 'roster')
@@ -92,6 +98,7 @@ export function AuthProvider({ children }) {
     }
 
     if (uploads.length > 0) {
+      console.log(`[nfl:auth] uploading ${uploads.length} local items to Supabase`);
       await Promise.all(uploads);
       // Re-fetch to get the complete merged list
       const { data: merged } = await supabase
@@ -106,6 +113,8 @@ export function AuthProvider({ children }) {
         );
       }
     }
+
+    console.log('[nfl:auth] hydration complete');
 
     // 4. Complete any pending save that triggered the login flow
     await useRosterStore.getState().completePendingSave(u);
