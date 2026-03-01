@@ -83,7 +83,7 @@ def _row_to_player(row: dict, season: int) -> dict:
     team = row.get("team") or "N/A"
     gsis_id = row.get("gsis_id") or ""
     full_name = row.get("full_name") or row.get("player_name") or "Unknown"
-    position = row.get("position") or row.get("depth_chart_position") or "N/A"
+    position = row.get("dc_position") or row.get("depth_chart_position") or row.get("position") or "N/A"
     return {
         "id": f"{season}-{team}-{gsis_id or full_name}-{uuid.uuid4().hex[:6]}",
         "name": full_name,
@@ -126,13 +126,18 @@ def get_roster(
     if depth_df is not None and not depth_df.is_empty():
         team_depth = depth_df.filter(pl.col("team") == team_upper)
         if not team_depth.is_empty():
+            dc_select_cols = ["gsis_id", "pos_rank"]
+            if "position" in team_depth.columns:
+                dc_select_cols.append("position")
             team_depth = (
                 team_depth
                 .sort("dt")
                 .group_by("gsis_id")
                 .last()
-                .select(["gsis_id", "pos_rank"])
+                .select(dc_select_cols)
             )
+            if "position" in team_depth.columns:
+                team_depth = team_depth.rename({"position": "dc_position"})
             filtered = filtered.join(team_depth, on="gsis_id", how="left")
         else:
             filtered = filtered.with_columns(pl.lit(None).cast(pl.Int64).alias("pos_rank"))
