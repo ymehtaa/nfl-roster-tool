@@ -30,6 +30,25 @@ app.add_middleware(
 _season_cache: dict[int, pl.DataFrame] = {}
 _depth_cache: dict[int, pl.DataFrame] = {}
 
+# ---------------------------------------------------------------------------
+# Historical team abbreviation mappings
+# Franchises that relocated/renamed use different abbreviations in nflverse
+# historical data.  Maps current_abbr -> [(historical_abbr, last_season), ...]
+# ---------------------------------------------------------------------------
+_RELOCATION_MAP: dict[str, list[tuple[str, int]]] = {
+    "LAC": [("SD",  2016)],  # San Diego Chargers through 2016
+    "LV":  [("OAK", 2019)],  # Oakland Raiders through 2019
+    "LA":  [("STL", 2015)],  # St. Louis Rams through 2015
+}
+
+
+def _resolve_team_abbr(team: str, season: int) -> str:
+    """Return the nflverse abbreviation used for *team* in *season*."""
+    for historical_abbr, last_season in _RELOCATION_MAP.get(team, []):
+        if season <= last_season:
+            return historical_abbr
+    return team
+
 
 def _normalize_depth_df(df: pl.DataFrame) -> pl.DataFrame:
     """Coerce varying depth-chart schemas into a canonical form with team/dt/pos_rank."""
@@ -118,7 +137,7 @@ def get_roster(
     """Return the roster for a given season and team as a list of Player objects."""
     df = _get_season_df(season)
 
-    team_upper = team.upper()
+    team_upper = _resolve_team_abbr(team.upper(), season)
     filtered = df.filter(pl.col("team") == team_upper)
 
     if filtered.is_empty():
