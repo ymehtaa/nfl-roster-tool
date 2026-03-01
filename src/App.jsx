@@ -7,13 +7,14 @@ import SavedRosters from './components/roster/SavedRosters';
 import CompareView from './components/compare/CompareView';
 import LoginModal from './components/layout/LoginModal';
 import { fetchRoster } from './services/dataService';
-import { fetchShare } from './services/shareService';
+import { fetchShare, fetchComparisonShare } from './services/shareService';
 import { useRosterStore } from './stores/useRosterStore';
 import { useAuth } from './contexts/AuthContext';
 
 export default function App() {
   const { user } = useAuth();
   const [shareNotice, setShareNotice] = useState(null);
+  const [sharedComparison, setSharedComparison] = useState(null);
 
   const {
     activeTab,
@@ -48,18 +49,31 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const shareId = params.get('share');
-    if (!shareId) return;
+    const shareCompId = params.get('shareComp');
+    if (!shareId && !shareCompId) return;
 
     window.history.replaceState({}, '', window.location.pathname);
 
-    fetchShare(shareId)
-      .then(({ name, players }) => {
-        loadSharedRoster(players);
-        setShareNotice({ type: 'success', msg: `Loaded shared roster: "${name}"` });
-      })
-      .catch(() => {
-        setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
-      });
+    if (shareId) {
+      fetchShare(shareId)
+        .then(({ name, players }) => {
+          loadSharedRoster(players);
+          setShareNotice({ type: 'success', msg: `Loaded shared roster: "${name}"` });
+        })
+        .catch(() => {
+          setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
+        });
+    } else if (shareCompId) {
+      fetchComparisonShare(shareCompId)
+        .then(({ name, left, right }) => {
+          setActiveTab('compare');
+          setSharedComparison({ left, right });
+          setShareNotice({ type: 'success', msg: `Loaded shared comparison: "${name}"` });
+        })
+        .catch(() => {
+          setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
+        });
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -88,6 +102,17 @@ export default function App() {
       <Header activeTab={activeTab} onTabChange={setActiveTab} user={user} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
+        {shareNotice && (
+          <div className={`text-sm rounded-lg px-4 py-3 flex items-center gap-2 border ${
+            shareNotice.type === 'success'
+              ? 'bg-green-950 border-green-700 text-green-300'
+              : 'bg-red-950 border-red-700 text-red-300'
+          }`}>
+            <span>{shareNotice.type === 'success' ? '✅' : '⚠️'}</span>
+            <span>{shareNotice.msg}</span>
+          </div>
+        )}
+
         {activeTab === 'builder' && (
           <>
             <SourceSelector onImport={handleImport} isLoading={isLoading} />
@@ -105,16 +130,6 @@ export default function App() {
                   Imported <strong>{lastImport.count}</strong> players from the{' '}
                   <strong>{lastImport.year} {lastImport.team}</strong> roster into the bank.
                 </span>
-              </div>
-            )}
-            {shareNotice && (
-              <div className={`text-sm rounded-lg px-4 py-3 flex items-center gap-2 border ${
-                shareNotice.type === 'success'
-                  ? 'bg-green-950 border-green-700 text-green-300'
-                  : 'bg-red-950 border-red-700 text-red-300'
-              }`}>
-                <span>{shareNotice.type === 'success' ? '✅' : '⚠️'}</span>
-                <span>{shareNotice.msg}</span>
               </div>
             )}
 
@@ -150,6 +165,9 @@ export default function App() {
             savedComparisons={savedComparisons}
             onSaveComparison={(name, left, right) => saveComparison(name, left, right, user)}
             onDeleteComparison={(name) => deleteComparison(name, user)}
+            sharedComparison={sharedComparison}
+            onSharedComparisonConsumed={() => setSharedComparison(null)}
+            user={user}
           />
         )}
       </main>
