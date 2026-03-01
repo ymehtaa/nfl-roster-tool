@@ -31,13 +31,26 @@ _season_cache: dict[int, pl.DataFrame] = {}
 _depth_cache: dict[int, pl.DataFrame] = {}
 
 
+def _normalize_depth_df(df: pl.DataFrame) -> pl.DataFrame:
+    """Coerce varying depth-chart schemas into a canonical form with team/dt/pos_rank."""
+    cols = set(df.columns)
+    if "club_code" in cols and "team" not in cols:
+        df = df.rename({"club_code": "team"})
+    if "week" in cols and "dt" not in cols:
+        df = df.with_columns(pl.col("week").cast(pl.Utf8).alias("dt")).drop("week")
+    if "depth_team" in cols and "pos_rank" not in cols:
+        df = df.rename({"depth_team": "pos_rank"})
+    return df
+
+
 def _get_depth_df(season: int) -> pl.DataFrame | None:
     """Return the depth chart DataFrame for `season`, or None if unavailable."""
     if season < 2001:          # nflreadpy depth charts start at 2001
         return None
     if season not in _depth_cache:
         try:
-            _depth_cache[season] = load_depth_charts(seasons=season)
+            df = load_depth_charts(seasons=season)
+            _depth_cache[season] = _normalize_depth_df(df)
         except Exception:
             return None        # Soft-fail — ordering degrades gracefully
     return _depth_cache[season]
