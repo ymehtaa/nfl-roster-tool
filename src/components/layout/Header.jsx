@@ -1,4 +1,4 @@
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Header({ activeTab, onTabChange }) {
   const { user, signInWithGoogle, signOut } = useAuth();

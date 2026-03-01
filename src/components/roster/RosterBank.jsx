@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import PositionBadge from './PositionBadge';
+import PositionBadge from '../ui/PositionBadge';
 
 export default function RosterBank({ batches, onAddPlayer, onRemoveBatch, rosterFull }) {
   // Track which batches the user has manually collapsed (all start expanded)

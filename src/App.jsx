@@ -1,10 +1,10 @@
-import Header from './components/Header';
-import SourceSelector from './components/SourceSelector';
-import RosterBank from './components/RosterBank';
-import RosterBuilder from './components/RosterBuilder';
-import SavedRosters from './components/SavedRosters';
-import CompareView from './components/CompareView';
-import LoginModal from './components/LoginModal';
+import Header from './components/layout/Header';
+import SourceSelector from './components/roster/SourceSelector';
+import RosterBank from './components/roster/RosterBank';
+import RosterBuilder from './components/roster/RosterBuilder';
+import SavedRosters from './components/roster/SavedRosters';
+import CompareView from './components/compare/CompareView';
+import LoginModal from './components/layout/LoginModal';
 import { fetchRoster } from './services/dataService';
 import { useRosterStore } from './stores/useRosterStore';
 import { useAuth } from './contexts/AuthContext';

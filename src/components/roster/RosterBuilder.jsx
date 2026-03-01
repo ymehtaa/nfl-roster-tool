@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import PositionBadge from './PositionBadge';
-import { SECTIONS, ALL_GROUPS, getGroupKey } from '../utils/positionGroups';
+import PositionBadge from '../ui/PositionBadge';
+import { SECTIONS, ALL_GROUPS, getGroupKey } from '../../utils/positionGroups';
 
 const MAX_ROSTER = 53;
 

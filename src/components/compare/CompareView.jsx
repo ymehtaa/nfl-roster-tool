@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import PositionBadge from './PositionBadge';
-import { SECTIONS, getGroupKey } from '../utils/positionGroups';
-import { fetchRoster } from '../services/dataService';
-import { NFL_TEAMS, YEARS } from '../constants/teams';
+import PositionBadge from '../ui/PositionBadge';
+import { SECTIONS, getGroupKey } from '../../utils/positionGroups';
+import { fetchRoster } from '../../services/dataService';
+import { NFL_TEAMS, YEARS } from '../../constants/teams';
 
 const NAME_RE = /^[a-zA-Z0-9]+$/;
 

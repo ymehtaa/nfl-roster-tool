@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NFL_TEAMS, YEARS } from '../constants/teams';
+import { NFL_TEAMS, YEARS } from '../../constants/teams';
 
 export default function SourceSelector({ onImport, isLoading }) {
   const [selectedYear, setSelectedYear] = useState(2007);
