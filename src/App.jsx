@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Header from './components/layout/Header';
 import SourceSelector from './components/roster/SourceSelector';
 import RosterBank from './components/roster/RosterBank';
@@ -180,6 +181,7 @@ export default function App() {
       </main>
 
       {showLoginModal && <LoginModal onClose={clearPendingSave} />}
+      <Analytics />
     </div>
   );
 }
