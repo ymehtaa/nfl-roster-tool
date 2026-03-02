@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { log } from './logService';
 
 // ── Roster shares ────────────────────────────────────────────────────────────
 
@@ -8,7 +9,11 @@ export async function createShare(name, players, creatorUserId = null) {
     .insert({ name, players, creator_user_id: creatorUserId })
     .select('share_id')
     .single();
-  if (error) throw error;
+  if (error) {
+    log('roster_share_create_failed', { name, count: players.length, error: error.message });
+    throw error;
+  }
+  log('roster_share_created', { shareId: data.share_id, name, count: players.length, userId: creatorUserId });
   return data.share_id;
 }
 
@@ -18,7 +23,11 @@ export async function fetchShare(shareId) {
     .select('name, players')
     .eq('share_id', shareId)
     .single();
-  if (error) throw error;
+  if (error) {
+    log('roster_share_fetch_failed', { shareId, error: error.message });
+    throw error;
+  }
+  log('roster_share_fetched', { shareId, name: data.name, count: data.players?.length });
   return data; // { name, players }
 }
 
@@ -30,7 +39,11 @@ export async function createComparisonShare(name, left, right, creatorUserId = n
     .insert({ name, left_data: left, right_data: right, creator_user_id: creatorUserId })
     .select('share_id')
     .single();
-  if (error) throw error;
+  if (error) {
+    log('comparison_share_create_failed', { name, error: error.message });
+    throw error;
+  }
+  log('comparison_share_created', { shareId: data.share_id, name, userId: creatorUserId });
   return data.share_id;
 }
 
@@ -40,6 +53,10 @@ export async function fetchComparisonShare(shareId) {
     .select('name, left_data, right_data')
     .eq('share_id', shareId)
     .single();
-  if (error) throw error;
+  if (error) {
+    log('comparison_share_fetch_failed', { shareId, error: error.message });
+    throw error;
+  }
+  log('comparison_share_fetched', { shareId, name: data.name });
   return { name: data.name, left: data.left_data, right: data.right_data };
 }

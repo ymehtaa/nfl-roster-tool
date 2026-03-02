@@ -10,13 +10,20 @@ Each cold start re-fetches data from nflverse. This is expected behaviour.
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import polars as pl
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from nflreadpy import load_rosters, load_depth_charts
 
 app = FastAPI()
+
+
+def _log(event: str, **kwargs) -> None:
+    """Print a structured JSON log line to stdout — captured by Vercel."""
+    print(json.dumps({"source": "server", "event": event, **kwargs}), flush=True)
+
 
 # ---------------------------------------------------------------------------
 # In-memory caches (warm-instance only — reset on cold start)
@@ -146,12 +153,20 @@ def get_roster(
     season: int = Query(..., ge=2000, le=2025),
     team: str = Query(..., min_length=2, max_length=3),
 ):
-    df = _get_season_df(season)
+    cache_hit = season in _season_cache
     team_upper = _resolve_team_abbr(team.upper(), season)
+
+    try:
+        df = _get_season_df(season)
+    except HTTPException as exc:
+        _log("roster_fetch_failed", team=team_upper, season=season, status=exc.status_code)
+        raise
+
     filtered = df.filter(pl.col("team") == team_upper)
 
     if filtered.is_empty():
         available = sorted(df["team"].drop_nulls().unique().to_list())
+        _log("roster_not_found", team=team_upper, season=season, available_count=len(available))
         raise HTTPException(
             status_code=404,
             detail={
@@ -184,9 +199,22 @@ def get_roster(
     )
 
     players = [_row_to_player(row, season) for row in filtered.to_dicts()]
+    _log("roster_fetched", team=team_upper, season=season, count=len(players), cache_hit=cache_hit)
     return {"season": season, "team": team_upper, "count": len(players), "players": players}
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/log")
+async def client_log(request: Request):
+    """Receive structured log events from the frontend and print to stdout."""
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            print(json.dumps({"source": "client", **body}), flush=True)
+    except Exception:
+        pass
+    return {"ok": True}

@@ -8,6 +8,7 @@ import CompareView from './components/compare/CompareView';
 import LoginModal from './components/layout/LoginModal';
 import { fetchRoster } from './services/dataService';
 import { fetchShare, fetchComparisonShare } from './services/shareService';
+import { log } from './services/logService';
 import { useRosterStore } from './stores/useRosterStore';
 import { useAuth } from './contexts/AuthContext';
 
@@ -59,9 +60,11 @@ export default function App() {
         .then(({ name, players }) => {
           loadSharedRoster(players);
           setShareNotice({ type: 'success', msg: `Loaded shared roster: "${name}"` });
+          log('roster_share_opened', { shareId, name, count: players?.length });
         })
         .catch(() => {
           setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
+          log('roster_share_open_failed', { shareId });
         });
     } else if (shareCompId) {
       fetchComparisonShare(shareCompId)
@@ -69,9 +72,11 @@ export default function App() {
           setActiveTab('compare');
           setSharedComparison({ left, right });
           setShareNotice({ type: 'success', msg: `Loaded shared comparison: "${name}"` });
+          log('comparison_share_opened', { shareId: shareCompId, name });
         })
         .catch(() => {
           setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
+          log('comparison_share_open_failed', { shareId: shareCompId });
         });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -90,8 +95,10 @@ export default function App() {
       const batchId = `${year}-${team}-${Date.now()}`;
       addBatch({ batchId, team, year, players });
       setLastImport({ team, year, count: players.length });
+      log('roster_imported', { team, year, count: players.length });
     } catch (err) {
       setError(`Import failed: ${err.message}`);
+      log('roster_import_failed', { team, year, error: err.message });
     } finally {
       setLoading(false);
     }

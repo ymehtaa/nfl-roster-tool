@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabaseClient';
+import { log } from '../services/logService';
 
 const MAX_ROSTER = 53;
 
@@ -9,7 +10,6 @@ const MAX_ROSTER = 53;
 // ---------------------------------------------------------------------------
 
 async function upsertItem(userId, type, name, payload) {
-  console.log(`[nfl:store] upsert ${type} "${name}" for user ${userId}`);
   const { error } = await supabase.from('saved_items').upsert(
     { user_id: userId, type, name, payload, updated_at: new Date().toISOString() },
     { onConflict: 'user_id,type,name' }
@@ -18,11 +18,9 @@ async function upsertItem(userId, type, name, payload) {
     console.error(`[nfl:store] upsert ${type} "${name}" FAILED:`, error.message, error);
     throw error;
   }
-  console.log(`[nfl:store] upsert ${type} "${name}" OK`);
 }
 
 async function deleteItem(userId, type, name) {
-  console.log(`[nfl:store] delete ${type} "${name}" for user ${userId}`);
   const { error } = await supabase
     .from('saved_items')
     .delete()
@@ -33,7 +31,6 @@ async function deleteItem(userId, type, name) {
     console.error(`[nfl:store] delete ${type} "${name}" FAILED:`, error.message, error);
     throw error;
   }
-  console.log(`[nfl:store] delete ${type} "${name}" OK`);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,16 +83,23 @@ export const useRosterStore = create(
           builtRoster: s.builtRoster.filter((p) => p.builtId !== builtId),
         })),
 
-      clearRoster: () => set({ builtRoster: [], currentRosterName: null }),
+      clearRoster: () => {
+        log('roster_cleared', { count: get().builtRoster.length });
+        set({ builtRoster: [], currentRosterName: null });
+      },
 
-      loadSharedRoster: (players) =>
+      loadSharedRoster: (players) => {
+        const loaded = players.slice(0, 53);
+        log('roster_share_loaded', { count: loaded.length });
         set({
-          builtRoster: players
-            .slice(0, 53)
-            .map((p) => ({ ...p, builtId: `built-${Date.now()}-${Math.random().toString(36).slice(2)}` })),
+          builtRoster: loaded.map((p) => ({
+            ...p,
+            builtId: `built-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          })),
           activeTab: 'builder',
           currentRosterName: null,
-        }),
+        });
+      },
 
       // ── Saved roster actions ──────────────────────────────────────────────
 
@@ -104,12 +108,11 @@ export const useRosterStore = create(
         const payload = { players: builtRoster, savedAt: Date.now() };
 
         if (!user) {
-          console.log(`[nfl:store] saveRoster "${name}" — no user, queuing pendingSave`);
+          log('roster_save_deferred', { name, count: builtRoster.length, reason: 'no_auth' });
           set({ pendingSave: { type: 'roster', name, data: payload } });
           return 'needs_auth';
         }
 
-        console.log(`[nfl:store] saveRoster "${name}" — user ${user.id}`);
         const entry = { name, ...payload };
         set((s) => ({
           savedRosters: s.savedRosters.some((r) => r.name === name)
@@ -120,17 +123,21 @@ export const useRosterStore = create(
 
         try {
           await upsertItem(user.id, 'roster', name, payload);
+          log('roster_saved', { name, count: builtRoster.length, userId: user.id });
         } catch (err) {
+          log('roster_save_sync_failed', { name, error: err.message, userId: user.id });
           console.error(`[nfl:store] saveRoster "${name}" sync failed — saved locally only`, err);
         }
       },
 
       deleteRoster: async (name, user) => {
         set((s) => ({ savedRosters: s.savedRosters.filter((r) => r.name !== name) }));
+        log('roster_deleted', { name, userId: user?.id ?? null });
         if (user) {
           try {
             await deleteItem(user.id, 'roster', name);
           } catch (err) {
+            log('roster_delete_sync_failed', { name, error: err.message, userId: user.id });
             console.error(`[nfl:store] deleteRoster "${name}" sync failed`, err);
           }
         }
@@ -138,7 +145,10 @@ export const useRosterStore = create(
 
       loadSavedRoster: (name) => {
         const found = get().savedRosters.find((r) => r.name === name);
-        if (found) set({ builtRoster: found.players, currentRosterName: name });
+        if (found) {
+          log('roster_loaded', { name, count: found.players.length });
+          set({ builtRoster: found.players, currentRosterName: name });
+        }
       },
 
       // ── Saved comparison actions ──────────────────────────────────────────
@@ -147,12 +157,11 @@ export const useRosterStore = create(
         const payload = { left, right, savedAt: Date.now() };
 
         if (!user) {
-          console.log(`[nfl:store] saveComparison "${name}" — no user, queuing pendingSave`);
+          log('comparison_save_deferred', { name, reason: 'no_auth' });
           set({ pendingSave: { type: 'comparison', name, data: payload } });
           return 'needs_auth';
         }
 
-        console.log(`[nfl:store] saveComparison "${name}" — user ${user.id}`);
         const entry = { name, ...payload };
         set((s) => ({
           savedComparisons: s.savedComparisons.some((c) => c.name === name)
@@ -162,7 +171,9 @@ export const useRosterStore = create(
 
         try {
           await upsertItem(user.id, 'comparison', name, payload);
+          log('comparison_saved', { name, userId: user.id });
         } catch (err) {
+          log('comparison_save_sync_failed', { name, error: err.message, userId: user.id });
           console.error(`[nfl:store] saveComparison "${name}" sync failed — saved locally only`, err);
         }
       },
@@ -171,10 +182,12 @@ export const useRosterStore = create(
         set((s) => ({
           savedComparisons: s.savedComparisons.filter((c) => c.name !== name),
         }));
+        log('comparison_deleted', { name, userId: user?.id ?? null });
         if (user) {
           try {
             await deleteItem(user.id, 'comparison', name);
           } catch (err) {
+            log('comparison_delete_sync_failed', { name, error: err.message, userId: user.id });
             console.error(`[nfl:store] deleteComparison "${name}" sync failed`, err);
           }
         }
@@ -206,6 +219,7 @@ export const useRosterStore = create(
                 : [...s.savedRosters, entry],
             }));
             await upsertItem(user.id, 'roster', name, data);
+            log('roster_saved', { name, count: data.players?.length, userId: user.id, via: 'pending' });
           } else if (type === 'comparison') {
             const entry = { name, ...data };
             set((s) => ({
@@ -214,8 +228,10 @@ export const useRosterStore = create(
                 : [...s.savedComparisons, entry],
             }));
             await upsertItem(user.id, 'comparison', name, data);
+            log('comparison_saved', { name, userId: user.id, via: 'pending' });
           }
         } catch (err) {
+          log('pending_save_failed', { type, name, error: err.message, userId: user.id });
           console.error(`[nfl:store] completePendingSave failed for ${type} "${name}"`, err);
         }
       },

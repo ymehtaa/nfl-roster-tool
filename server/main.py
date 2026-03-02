@@ -5,21 +5,28 @@ Uses nflreadpy.load_rosters() to serve roster data via a FastAPI REST endpoint.
 
 from __future__ import annotations
 
+import json
 import uuid
 from functools import lru_cache
 
 import polars as pl
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from nflreadpy import load_rosters, load_depth_charts
 
 app = FastAPI(title="NFL Roster Architect API")
 
+
+def _log(event: str, **kwargs) -> None:
+    """Print a structured JSON log line to stdout."""
+    print(json.dumps({"source": "server", "event": event, **kwargs}), flush=True)
+
+
 # Allow the Vite dev server (and any local origin) to call the API.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -154,14 +161,20 @@ def get_roster(
     team: str = Query(..., min_length=2, max_length=3, description="Team abbreviation, e.g. NE"),
 ):
     """Return the roster for a given season and team as a list of Player objects."""
-    df = _get_season_df(season)
-
+    cache_hit = season in _season_cache
     team_upper = _resolve_team_abbr(team.upper(), season)
+
+    try:
+        df = _get_season_df(season)
+    except HTTPException as exc:
+        _log("roster_fetch_failed", team=team_upper, season=season, status=exc.status_code)
+        raise
+
     filtered = df.filter(pl.col("team") == team_upper)
 
     if filtered.is_empty():
-        # Surface the distinct teams present so the caller can debug abbreviation mismatches.
         available = sorted(df["team"].drop_nulls().unique().to_list())
+        _log("roster_not_found", team=team_upper, season=season, available_count=len(available))
         raise HTTPException(
             status_code=404,
             detail={
@@ -175,7 +188,6 @@ def get_roster(
     if depth_df is not None and not depth_df.is_empty():
         team_depth = depth_df.filter(pl.col("team") == team_upper)
         if not team_depth.is_empty():
-            # Keep only the latest snapshot per player (depth data can be weekly)
             team_depth = (
                 team_depth
                 .sort("dt")
@@ -189,7 +201,6 @@ def get_roster(
     else:
         filtered = filtered.with_columns(pl.lit(None).cast(pl.Int64).alias("pos_rank"))
 
-    # Sort: starters (rank 1) first, then ascending rank, nulls last; tiebreak by years_exp desc
     filtered = filtered.sort(
         ["pos_rank", "years_exp"],
         descending=[False, True],
@@ -197,15 +208,22 @@ def get_roster(
     )
 
     players = [_row_to_player(row, season) for row in filtered.to_dicts()]
-
-    return {
-        "season": season,
-        "team": team_upper,
-        "count": len(players),
-        "players": players,
-    }
+    _log("roster_fetched", team=team_upper, season=season, count=len(players), cache_hit=cache_hit)
+    return {"season": season, "team": team_upper, "count": len(players), "players": players}
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/log")
+async def client_log(request: Request):
+    """Receive structured log events from the frontend and print to stdout."""
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            print(json.dumps({"source": "client", **body}), flush=True)
+    except Exception:
+        pass
+    return {"ok": True}
