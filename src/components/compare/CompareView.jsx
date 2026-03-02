@@ -5,6 +5,7 @@ import { fetchRoster } from '../../services/dataService';
 import { NFL_TEAMS, YEARS } from '../../constants/teams';
 import { createComparisonShare } from '../../services/shareService';
 import { log } from '../../services/logService';
+import { track } from '@vercel/analytics';
 
 const NAME_RE = /^[a-zA-Z0-9 ]+$/;
 
@@ -277,6 +278,7 @@ export default function CompareView({ savedRosters, savedComparisons, onSaveComp
       const teamObj = NFL_TEAMS.find(t => t.abbr === team);
       setter({ roster: players, label: `${year} ${teamObj?.name ?? team}`, isLoading: false, error: null });
       log('comparison_team_loaded', { side, team, year, count: players.length });
+      track('comparison_team_loaded', { team, year });
     } catch (err) {
       setter(prev => ({ ...prev, isLoading: false, error: err.message }));
       log('comparison_team_load_failed', { side, team, year, error: err.message });
@@ -289,6 +291,7 @@ export default function CompareView({ savedRosters, savedComparisons, onSaveComp
     const setter = side === 'left' ? setLeft : setRight;
     setter({ roster: found.players, label: found.name, isLoading: false, error: null });
     log('comparison_saved_roster_selected', { side, name, count: found.players.length });
+    track('comparison_saved_roster_selected');
   }
 
   function loadComparison(c) {

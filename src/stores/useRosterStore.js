@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabaseClient';
 import { log } from '../services/logService';
+import { track } from '@vercel/analytics';
 
 const MAX_ROSTER = 53;
 
@@ -85,6 +86,7 @@ export const useRosterStore = create(
 
       clearRoster: () => {
         log('roster_cleared', { count: get().builtRoster.length });
+        track('roster_cleared', { count: get().builtRoster.length });
         set({ builtRoster: [], currentRosterName: null });
       },
 
@@ -124,6 +126,7 @@ export const useRosterStore = create(
         try {
           await upsertItem(user.id, 'roster', name, payload);
           log('roster_saved', { name, count: builtRoster.length, userId: user.id });
+          track('roster_saved', { count: builtRoster.length });
         } catch (err) {
           log('roster_save_sync_failed', { name, error: err.message, userId: user.id });
           console.error(`[nfl:store] saveRoster "${name}" sync failed — saved locally only`, err);
@@ -133,6 +136,7 @@ export const useRosterStore = create(
       deleteRoster: async (name, user) => {
         set((s) => ({ savedRosters: s.savedRosters.filter((r) => r.name !== name) }));
         log('roster_deleted', { name, userId: user?.id ?? null });
+        track('roster_deleted');
         if (user) {
           try {
             await deleteItem(user.id, 'roster', name);
@@ -147,6 +151,7 @@ export const useRosterStore = create(
         const found = get().savedRosters.find((r) => r.name === name);
         if (found) {
           log('roster_loaded', { name, count: found.players.length });
+          track('roster_loaded');
           set({ builtRoster: found.players, currentRosterName: name });
         }
       },
@@ -172,6 +177,7 @@ export const useRosterStore = create(
         try {
           await upsertItem(user.id, 'comparison', name, payload);
           log('comparison_saved', { name, userId: user.id });
+          track('comparison_saved');
         } catch (err) {
           log('comparison_save_sync_failed', { name, error: err.message, userId: user.id });
           console.error(`[nfl:store] saveComparison "${name}" sync failed — saved locally only`, err);
@@ -183,6 +189,7 @@ export const useRosterStore = create(
           savedComparisons: s.savedComparisons.filter((c) => c.name !== name),
         }));
         log('comparison_deleted', { name, userId: user?.id ?? null });
+        track('comparison_deleted');
         if (user) {
           try {
             await deleteItem(user.id, 'comparison', name);
@@ -220,6 +227,7 @@ export const useRosterStore = create(
             }));
             await upsertItem(user.id, 'roster', name, data);
             log('roster_saved', { name, count: data.players?.length, userId: user.id, via: 'pending' });
+            track('roster_saved', { count: data.players?.length ?? 0 });
           } else if (type === 'comparison') {
             const entry = { name, ...data };
             set((s) => ({
@@ -229,6 +237,7 @@ export const useRosterStore = create(
             }));
             await upsertItem(user.id, 'comparison', name, data);
             log('comparison_saved', { name, userId: user.id, via: 'pending' });
+            track('comparison_saved');
           }
         } catch (err) {
           log('pending_save_failed', { type, name, error: err.message, userId: user.id });

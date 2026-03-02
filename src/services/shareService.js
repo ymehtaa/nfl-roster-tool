@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { log } from './logService';
+import { track } from '@vercel/analytics';
 
 // ── Roster shares ────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ export async function createShare(name, players, creatorUserId = null) {
     throw error;
   }
   log('roster_share_created', { shareId: data.share_id, name, count: players.length, userId: creatorUserId });
+  track('roster_share_created', { count: players.length });
   return data.share_id;
 }
 
@@ -44,6 +46,7 @@ export async function createComparisonShare(name, left, right, creatorUserId = n
     throw error;
   }
   log('comparison_share_created', { shareId: data.share_id, name, userId: creatorUserId });
+  track('comparison_share_created');
   return data.share_id;
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { track } from '@vercel/analytics';
 import Header from './components/layout/Header';
 import SourceSelector from './components/roster/SourceSelector';
 import RosterBank from './components/roster/RosterBank';
@@ -62,6 +63,7 @@ export default function App() {
           loadSharedRoster(players);
           setShareNotice({ type: 'success', msg: `Loaded shared roster: "${name}"` });
           log('roster_share_opened', { shareId, name, count: players?.length });
+          track('roster_share_opened');
         })
         .catch(() => {
           setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
@@ -74,6 +76,7 @@ export default function App() {
           setSharedComparison({ left, right });
           setShareNotice({ type: 'success', msg: `Loaded shared comparison: "${name}"` });
           log('comparison_share_opened', { shareId: shareCompId, name });
+          track('comparison_share_opened');
         })
         .catch(() => {
           setShareNotice({ type: 'error', msg: 'Share link is invalid or no longer exists.' });
@@ -97,6 +100,7 @@ export default function App() {
       addBatch({ batchId, team, year, players });
       setLastImport({ team, year, count: players.length });
       log('roster_imported', { team, year, count: players.length });
+      track('roster_imported', { team, year, count: players.length });
     } catch (err) {
       setError(`Import failed: ${err.message}`);
       log('roster_import_failed', { team, year, error: err.message });
